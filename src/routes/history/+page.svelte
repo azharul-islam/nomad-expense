@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { transactionStore } from '$lib/stores.svelte';
+	import { CURRENCY_SYMBOL, formatCurrency, parseAmountToCents } from '$lib/utils/currency';
 	import { onMount } from 'svelte';
 
 	let editingId = $state<string | null>(null);
@@ -12,15 +13,6 @@
 			transactionStore.loadTransactions(true);
 		}
 	});
-
-	function formatAmount(cents: number, type: 'income' | 'expense'): string {
-		const isNegative = type === 'expense';
-		const absCents = Math.abs(cents);
-		const dollars = Math.floor(absCents / 100);
-		const remainingCents = absCents % 100;
-		const formatted = `${dollars.toLocaleString()}.${remainingCents.toString().padStart(2, '0')}`;
-		return isNegative ? `-${formatted}` : formatted;
-	}
 
 	function formatDate(timestamp: number): string {
 		return new Date(timestamp).toLocaleDateString([], {
@@ -47,7 +39,7 @@
 	}
 
 	async function saveEdit(id: string) {
-		const cents = Math.round(parseFloat(editAmount) * 100);
+		const cents = parseAmountToCents(editAmount);
 		if (isNaN(cents) || cents <= 0) return;
 
 		await transactionStore.update(id, {
@@ -113,21 +105,21 @@
 				<div class="rounded-2xl bg-emerald-950/40 p-4">
 					<p class="text-xs font-medium text-emerald-400 uppercase">Total Income</p>
 					<p class="mt-1 text-xl font-bold text-white">
-						${(
+						{CURRENCY_SYMBOL}{formatCurrency(
 							transactionStore.transactions
 								.filter((t) => t.type === 'income')
-								.reduce((sum, t) => sum + t.amount, 0) / 100
-						).toFixed(2)}
+								.reduce((sum, t) => sum + t.amount, 0)
+						)}
 					</p>
 				</div>
 				<div class="rounded-2xl bg-rose-950/40 p-4">
 					<p class="text-xs font-medium text-rose-400 uppercase">Total Expenses</p>
 					<p class="mt-1 text-xl font-bold text-white">
-						${(
+						{CURRENCY_SYMBOL}{formatCurrency(
 							transactionStore.transactions
 								.filter((t) => t.type === 'expense')
-								.reduce((sum, t) => sum + t.amount, 0) / 100
-						).toFixed(2)}
+								.reduce((sum, t) => sum + t.amount, 0)
+						)}
 					</p>
 				</div>
 			</div>
@@ -138,8 +130,8 @@
 					<div class="mb-3 flex items-center justify-between">
 						<h3 class="text-sm font-semibold text-slate-300">{formatMonthLabel(monthKey)}</h3>
 						<div class="flex gap-3 text-xs">
-							<span class="text-emerald-400">+${(data.income / 100).toFixed(2)}</span>
-							<span class="text-rose-400">-${(data.expense / 100).toFixed(2)}</span>
+							<span class="text-emerald-400">+{CURRENCY_SYMBOL}{formatCurrency(data.income)}</span>
+							<span class="text-rose-400">-{CURRENCY_SYMBOL}{formatCurrency(data.expense)}</span>
 						</div>
 					</div>
 
@@ -216,7 +208,7 @@
 											? 'text-emerald-400'
 											: 'text-rose-400'}"
 									>
-										{formatAmount(tx.amount, tx.type)}
+										{tx.type === 'expense' ? '-' : '+'}{CURRENCY_SYMBOL}{formatCurrency(tx.amount)}
 									</span>
 									<div class="flex shrink-0 gap-1">
 										<button

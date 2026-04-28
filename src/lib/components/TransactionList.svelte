@@ -1,18 +1,10 @@
 <script lang="ts">
 	import { transactionStore } from '$lib/stores.svelte';
+	import { CURRENCY_SYMBOL, formatCurrency } from '$lib/utils/currency';
 	import { onMount, tick } from 'svelte';
 
 	let listContainer: HTMLDivElement;
 	let shouldAutoScroll = $state(true);
-
-	function formatAmount(cents: number, type: 'income' | 'expense'): string {
-		const isNegative = type === 'expense';
-		const absCents = Math.abs(cents);
-		const dollars = Math.floor(absCents / 100);
-		const remainingCents = absCents % 100;
-		const formatted = `${dollars.toLocaleString()}.${remainingCents.toString().padStart(2, '0')}`;
-		return isNegative ? `-${formatted}` : formatted;
-	}
 
 	function formatDate(timestamp: number): string {
 		const date = new Date(timestamp);
@@ -25,7 +17,6 @@
 	}
 
 	function groupByDate(transactions: typeof transactionStore.transactions) {
-		// Reverse so oldest first (chat-style: bottom has newest)
 		const reversed = [...transactions].reverse();
 		const groups: { date: string; items: typeof transactions }[] = [];
 		let currentGroup: { date: string; items: typeof transactions } | null = null;
@@ -49,7 +40,6 @@
 	}
 
 	$effect(() => {
-		// Auto-scroll when transactions change
 		if (transactionStore.transactions.length > 0) {
 			scrollToBottom();
 		}
@@ -61,7 +51,6 @@
 		const isNearBottom = scrollHeight - scrollTop - clientHeight < 50;
 		shouldAutoScroll = isNearBottom;
 
-		// Load more when near top (older transactions)
 		if (scrollTop < 50 && transactionStore.hasMore && !transactionStore.loading) {
 			transactionStore.loadMore();
 		}
@@ -108,7 +97,7 @@
 								? 'bg-emerald-950/40'
 								: 'bg-slate-800/60'}"
 						>
-							<div class="min-w-0 flex-1">
+							<div class="flex-1 min-w-0">
 								{#if tx.note}
 									<p class="truncate text-sm font-medium text-slate-200">{tx.note}</p>
 								{:else}
@@ -130,7 +119,7 @@
 									? 'text-emerald-400'
 									: 'text-rose-400'}"
 							>
-								{formatAmount(tx.amount, tx.type)}
+								{tx.type === 'expense' ? '-' : '+'}{CURRENCY_SYMBOL}{formatCurrency(tx.amount)}
 							</span>
 						</div>
 					{/each}

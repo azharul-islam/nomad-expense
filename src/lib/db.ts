@@ -1,5 +1,17 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 
+function generateUUID(): string {
+	if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+		return crypto.randomUUID();
+	}
+	// Fallback for non-secure contexts
+	return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+		const r = (Math.random() * 16) | 0;
+		const v = c === 'x' ? r : (r & 0x3) | 0x8;
+		return v.toString(16);
+	});
+}
+
 export interface Transaction {
 	id: string;
 	amount: number; // stored in smallest unit (cents) to avoid float issues
@@ -54,7 +66,7 @@ export async function addTransaction(
 	const db = await getDB();
 	const transaction: Transaction = {
 		...tx,
-		id: crypto.randomUUID(),
+		id: generateUUID(),
 		createdAt: Date.now()
 	};
 	await db.put('transactions', transaction);
@@ -137,7 +149,7 @@ export async function getTransactionsByDateRange(
 	return items;
 }
 
-export async function getBalance(currency: string = 'USD'): Promise<number> {
+export async function getBalance(currency: string = 'QAR'): Promise<number> {
 	const db = await getDB();
 	const tx = db.transaction('transactions', 'readonly');
 	const store = tx.store;

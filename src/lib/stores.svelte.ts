@@ -19,7 +19,7 @@ class TransactionStore {
 	loading = $state(false);
 	hasMore = $state(true);
 	private cursor: number | null = null;
-	private currency = 'USD';
+	private currency = 'QAR';
 
 	async init() {
 		await seedDefaultCards();
@@ -64,11 +64,16 @@ class TransactionStore {
 	}
 
 	async add(tx: Parameters<typeof addTransaction>[0]) {
-		const newTx = await addTransaction(tx);
-		this.transactions = [newTx, ...this.transactions];
-		await this.refreshBalance();
-		await this.ensurePersistentStorage();
-		return newTx;
+		try {
+			const newTx = await addTransaction(tx);
+			this.transactions = [newTx, ...this.transactions];
+			await this.refreshBalance();
+			await this.ensurePersistentStorage();
+			return newTx;
+		} catch (err) {
+			console.error('Failed to add transaction:', err);
+			throw err;
+		}
 	}
 
 	async update(id: string, updates: Parameters<typeof updateTransaction>[1]) {

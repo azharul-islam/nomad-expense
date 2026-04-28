@@ -1,11 +1,14 @@
 <script lang="ts">
 	import { transactionStore } from '$lib/stores.svelte';
+	import { CURRENCY, CURRENCY_SYMBOL, formatCurrencyInput, parseAmountToCents } from '$lib/utils/currency';
 
 	let amount = $state('');
 	let note = $state('');
 	let type = $state<'income' | 'expense'>('expense');
 	let paymentMethod = $state<'cash' | 'card'>('cash');
 	let selectedCardId = $state<string | null>(null);
+	let isSubmitting = $state(false);
+	let errorMessage = $state('');
 
 	const digitRows = [
 		['7', '8', '9'],
@@ -13,6 +16,8 @@
 		['1', '2', '3'],
 		['.', '0', 'backspace']
 	];
+
+	let clearTimer: ReturnType<typeof setTimeout> | null = null;
 
 	function handleDigit(digit: string) {
 		if (digit === 'backspace') {
@@ -25,6 +30,21 @@
 		}
 		if (amount.replace('.', '').length >= 8) return;
 		amount += digit;
+	}
+
+	function handleBackspaceStart() {
+		clearTimer = setTimeout(() => {
+			amount = '';
+			clearTimer = null;
+		}, 500);
+	}
+
+	function handleBackspaceEnd() {
+		if (clearTimer) {
+			clearTimeout(clearTimer);
+			clearTimer = null;
+			amount = amount.slice(0, -1);
+		}
 	}
 
 	function handleTypeToggle(newType: 'income' | 'expense') {
@@ -40,27 +60,31 @@
 		}
 	}
 
-	function parseAmount(val: string): number {
-		const parsed = parseFloat(val);
-		if (isNaN(parsed)) return 0;
-		return Math.round(parsed * 100);
-	}
-
 	async function handleSubmit() {
-		const cents = parseAmount(amount);
+		const cents = parseAmountToCents(amount);
 		if (cents <= 0) return;
 
-		await transactionStore.add({
-			amount: cents,
-			currency: 'USD',
-			type,
-			paymentMethod,
-			cardId: paymentMethod === 'card' ? selectedCardId : null,
-			note: note.trim()
-		});
+		isSubmitting = true;
+		errorMessage = '';
 
-		amount = '';
-		note = '';
+		try {
+			await transactionStore.add({
+				amount: cents,
+				currency: CURRENCY,
+				type,
+				paymentMethod,
+				cardId: paymentMethod === 'card' ? selectedCardId : null,
+				note: note.trim()
+			});
+
+			amount = '';
+			note = '';
+		} catch (err) {
+			errorMessage = err instanceof Error ? err.message : 'Failed to add transaction';
+			console.error('Submit failed:', err);
+		} finally {
+			isSubmitting = false;
+		}
 	}
 
 	// Swipe gesture for type toggle
@@ -77,12 +101,7 @@
 		}
 	}
 
-	const formattedAmount = $derived(() => {
-		if (amount === '') return '0.00';
-		const parsed = parseFloat(amount);
-		if (isNaN(parsed)) return '0.00';
-		return parsed.toFixed(2);
-	});
+	const displayParts = $derived(formatCurrencyInput(amount));
 </script>
 
 <div class="pb-safe flex shrink-0 flex-col border-t border-slate-800 bg-slate-950" style="touch-action: none;">
@@ -120,11 +139,16 @@
 			</div>
 		</div>
 
-		<div class="flex items-baseline gap-1">
-			<span class="text-lg font-semibold {type === 'income' ? 'text-emerald-400' : 'text-rose-400'}"
-				>$</span
-			>
-			<span class="text-3xl font-bold text-white">{formattedAmount()}</span>
+		<div class="flex items-baseline">
+			<span class="mr-1 text-lg font-semibold text-slate-500">{CURRENCY_SYMBOL}</span><span
+				class="text-3xl font-bold tracking-tight text-white"
+			>{displayParts.integerPart}</span><span
+				class="text-3xl font-bold tracking-tight {displayParts.dotActive ? 'text-white' : 'text-slate-600'}"
+			>.</span><span
+				class="text-3xl font-bold tracking-tight {displayParts.decimalDigitsEntered >= 1 ? 'text-white' : 'text-slate-600'}"
+			>{displayParts.dec1}</span><span
+				class="text-3xl font-bold tracking-tight {displayParts.decimalDigitsEntered >= 2 ? 'text-white' : 'text-slate-600'}"
+			>{displayParts.dec2}</span>
 		</div>
 	</div>
 
@@ -167,14 +191,14 @@
 		{#if paymentMethod === 'card'}
 			<div class="flex gap-2 overflow-x-auto">
 				{#each transactionStore.cards as card}
-				<button
-					class="flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors {selectedCardId ===
-					card.id
-						? 'border-sky-500 bg-sky-500/10 text-sky-400'
-						: 'border-slate-700 text-slate-400'}"
-					style="touch-action: manipulation;"
-					onclick={() => (selectedCardId = card.id)}
-				>
+					<button
+						class="flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors {selectedCardId ===
+						card.id
+							? 'border-sky-500 bg-sky-500/10 text-sky-400'
+							: 'border-slate-700 text-slate-400'}"
+						style="touch-action: manipulation;"
+						onclick={() => (selectedCardId = card.id)}
+					>
 						<span class="h-2 w-2 rounded-full" style="background-color: {card.color}"></span>
 						{card.name}
 					</button>
@@ -187,15 +211,15 @@
 	<div class="grid grid-cols-3 gap-px bg-slate-800">
 		{#each digitRows as row}
 			{#each row as digit}
-				<button
-					class="flex h-16 items-center justify-center bg-slate-950 text-xl font-medium text-slate-200 transition-colors active:bg-slate-800 {digit ===
-						'.' || digit === 'backspace'
-						? 'text-slate-400'
-						: ''}"
-					style="touch-action: manipulation;"
-					onclick={() => handleDigit(digit)}
-				>
-					{#if digit === 'backspace'}
+				{#if digit === 'backspace'}
+					<button
+						class="flex h-16 items-center justify-center bg-slate-950 text-slate-400 transition-colors active:bg-slate-800"
+						style="touch-action: manipulation;"
+						onpointerdown={handleBackspaceStart}
+						onpointerup={handleBackspaceEnd}
+						onpointerleave={handleBackspaceEnd}
+						aria-label="Backspace"
+					>
 						<svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 							<path
 								stroke-linecap="round"
@@ -204,26 +228,50 @@
 								d="M12 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M3 12l6.414 6.414a2 2 0 001.414.586H21a2 2 0 002-2V7a2 2 0 00-2-2h-9.172a2 2 0 00-1.414.586L3 12z"
 							/>
 						</svg>
-					{:else}
+					</button>
+				{:else}
+					<button
+						class="flex h-16 items-center justify-center bg-slate-950 text-xl font-medium text-slate-200 transition-colors active:bg-slate-800 {digit ===
+							'.'
+							? 'text-slate-400'
+							: ''}"
+						style="touch-action: manipulation;"
+						onclick={() => handleDigit(digit)}
+					>
 						{digit}
-					{/if}
-				</button>
+					</button>
+				{/if}
 			{/each}
 		{/each}
 	</div>
 
+	<!-- Error Message -->
+	{#if errorMessage}
+		<div class="bg-rose-950/60 px-4 py-2 text-center text-xs font-medium text-rose-400">
+			{errorMessage}
+		</div>
+	{/if}
+
 	<!-- Add Button -->
 	<button
-		class="flex h-14 w-full items-center justify-center bg-sky-600 text-base font-semibold text-white transition-colors active:bg-sky-700 {parseAmount(
+		class="flex h-14 w-full items-center justify-center bg-sky-600 text-base font-semibold text-white transition-colors active:bg-sky-700 {parseAmountToCents(
 			amount
-		) <= 0
+		) <= 0 || isSubmitting
 			? 'opacity-50'
 			: ''}"
 		style="touch-action: manipulation;"
 		onclick={handleSubmit}
-		disabled={parseAmount(amount) <= 0}
+		disabled={parseAmountToCents(amount) <= 0 || isSubmitting}
 	>
-		Add {type === 'income' ? 'Income' : 'Expense'}
+		{#if isSubmitting}
+			<svg class="mr-2 h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+				<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+				<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+			</svg>
+			Adding...
+		{:else}
+			Add {type === 'income' ? 'Income' : 'Expense'}
+		{/if}
 	</button>
 </div>
 
