@@ -60,6 +60,24 @@ function getDB(): Promise<IDBPDatabase<ExpenseDB>> {
 	return dbPromise;
 }
 
+export async function resetDB(): Promise<void> {
+	if (dbPromise) {
+		try {
+			const db = await dbPromise;
+			db.close();
+		} catch {
+			// ignore
+		}
+		dbPromise = null;
+	}
+}
+
+export async function getAllTransactions(): Promise<Transaction[]> {
+	const db = await getDB();
+	const items = await db.getAll('transactions');
+	return items.sort((a, b) => b.createdAt - a.createdAt);
+}
+
 export async function addTransaction(
 	tx: Omit<Transaction, 'id' | 'createdAt'>
 ): Promise<Transaction> {
@@ -103,9 +121,17 @@ export async function getTransactions(
 	const index = store.index('by-date');
 
 	const items: Transaction[] = [];
-	let cursor = options.cursor
-		? index.openCursor(options.cursor, direction)
-		: index.openCursor(null, direction);
+	let cursor: ReturnType<typeof index.openCursor>;
+
+	if (options.cursor != null) {
+		if (direction === 'prev') {
+			cursor = index.openCursor(IDBKeyRange.upperBound(options.cursor, true), direction);
+		} else {
+			cursor = index.openCursor(IDBKeyRange.lowerBound(options.cursor, true), direction);
+		}
+	} else {
+		cursor = index.openCursor(null, direction);
+	}
 
 	let result = await cursor;
 	while (result && items.length < limit) {
@@ -167,6 +193,29 @@ export async function getBalance(currency: string = 'QAR'): Promise<number> {
 	return balance;
 }
 
+export async function getTotals(currency: string = 'QAR'): Promise<{ income: number; expense: number }> {
+	const db = await getDB();
+	const tx = db.transaction('transactions', 'readonly');
+	const store = tx.store;
+	let cursor = await store.openCursor();
+
+	let income = 0;
+	let expense = 0;
+	while (cursor) {
+		const item = cursor.value;
+		if (item.currency === currency) {
+			if (item.type === 'income') {
+				income += item.amount;
+			} else {
+				expense += item.amount;
+			}
+		}
+		cursor = await cursor.continue();
+	}
+
+	return { income, expense };
+}
+
 // Card management
 export async function getCards(): Promise<Card[]> {
 	const db = await getDB();
@@ -220,4 +269,34 @@ export async function isStoragePersisted(): Promise<boolean> {
 		return navigator.storage.persisted();
 	}
 	return false;
+}
+
+export async function bulkAddTransactions(
+	transactions: Transaction[]
+): Promise<void> {
+	const db = await getDB();
+	const tx = db.transaction('transactions', 'readwrite');
+	for (const transaction of transactions) {
+		await tx.store.put(transaction);
+	}
+	await tx.done;
+}
+
+export async function bulkAddCards(cards: Card[]): Promise<void> {
+	const db = await getDB();
+	const tx = db.transaction('cards', 'readwrite');
+	for (const card of cards) {
+		await tx.store.put(card);
+	}
+	await tx.done;
+}
+
+export async function clearAllTransactions(): Promise<void> {
+	const db = await getDB();
+	await db.clear('transactions');
+}
+
+export async function clearAllCards(): Promise<void> {
+	const db = await getDB();
+	await db.clear('cards');
 }

@@ -1,1 +1,35 @@
 @import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@font-face {
+	font-family: 'Google Sans';
+	src: url('/fonts/GoogleSans-Variable.ttf') format('truetype');
+	font-weight: 100 900;
+	font-style: normal;
+	font-display: swap;
+}
+
+@theme {
+	--font-sans: 'Google Sans', sans-serif;
+  --color-bg-base: #f3f4f6;
+  --color-bg-base-dark: #020617;
+
+  --color-surface: #ffffff;
+  --color-surface-dark: #1e293b;
+
+  --color-surface-elevated: #f9fafb;
+  --color-surface-elevated-dark: #1e293b;
+
+  --color-text-primary: #111827;
+  --color-text-primary-dark: #ffffff;
+
+  --color-text-secondary: #374151;
+  --color-text-secondary-dark: #cbd5e1;
+
+  --color-text-muted: #9ca3af;
+  --color-text-muted-dark: #94a3b8;
+
+  --color-border-light: #e5e7eb;
+  --color-border-dark: #334155;
+}

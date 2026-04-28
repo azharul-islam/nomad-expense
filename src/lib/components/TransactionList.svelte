@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { transactionStore } from '$lib/stores.svelte';
 	import { CURRENCY_SYMBOL, formatCurrency } from '$lib/utils/currency';
+	import TransactionListItem from '$lib/components/TransactionListItem.svelte';
 	import { onMount, tick } from 'svelte';
 
 	let listContainer: HTMLDivElement;
@@ -68,20 +69,24 @@
 	onscroll={handleScroll}
 	class="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-2"
 >
-	{#if transactionStore.transactions.length === 0}
-		<div class="flex h-full flex-col items-center justify-center text-slate-500">
+	{#if !transactionStore.initialized}
+		<div class="flex h-full flex-col items-center justify-center text-gray-400 dark:text-slate-500">
+			<p class="text-sm">Loading transactions...</p>
+		</div>
+	{:else if transactionStore.transactions.length === 0}
+		<div class="flex h-full flex-col items-center justify-center text-gray-400 dark:text-slate-500">
 			<p class="text-sm">No transactions yet</p>
 			<p class="mt-1 text-xs">Add your first expense below</p>
 		</div>
 	{:else}
 		{#if transactionStore.loading && transactionStore.hasMore}
-			<div class="py-2 text-center text-xs text-slate-500">Loading...</div>
+			<div class="py-2 text-center text-xs text-gray-400 dark:text-slate-500">Loading...</div>
 		{/if}
 
 		{#each grouped as group}
 			<div class="mb-4">
 				<div class="sticky top-0 z-10 mb-2 flex justify-center">
-					<span class="rounded-full bg-slate-800 px-3 py-0.5 text-xs font-medium text-slate-400">
+					<span class="rounded-full bg-white px-3 py-0.5 text-xs font-medium text-gray-500 shadow-sm dark:bg-slate-800 dark:text-slate-400">
 						{new Date(group.date).toLocaleDateString([], {
 							weekday: 'short',
 							month: 'short',
@@ -92,36 +97,13 @@
 
 				<div class="flex flex-col gap-2">
 					{#each group.items as tx (tx.id)}
-						<div
-							class="flex items-center gap-3 rounded-2xl px-4 py-3 {tx.type === 'income'
-								? 'bg-emerald-950/40'
-								: 'bg-slate-800/60'}"
-						>
-							<div class="flex-1 min-w-0">
-								{#if tx.note}
-									<p class="truncate text-sm font-medium text-slate-200">{tx.note}</p>
-								{:else}
-									<p class="text-sm text-slate-400">
-										{tx.paymentMethod === 'card' ? 'Card' : 'Cash'}
-										{#if tx.cardId}
-											{#each transactionStore.cards as card}
-												{#if card.id === tx.cardId}
-													· {card.name}
-												{/if}
-											{/each}
-										{/if}
-									</p>
-								{/if}
-								<p class="mt-0.5 text-xs text-slate-500">{formatDate(tx.createdAt)}</p>
-							</div>
-							<span
-								class="shrink-0 text-base font-semibold {tx.type === 'income'
-									? 'text-emerald-400'
-									: 'text-rose-400'}"
-							>
-								{tx.type === 'expense' ? '-' : '+'}{CURRENCY_SYMBOL}{formatCurrency(tx.amount)}
-							</span>
-						</div>
+						<TransactionListItem
+							transaction={tx}
+							formatDate={formatDate}
+							class={tx.type === 'income'
+								? 'bg-emerald-50 dark:bg-emerald-950/40'
+								: 'bg-white/80 shadow-sm dark:bg-slate-800/60'}
+						/>
 					{/each}
 				</div>
 			</div>

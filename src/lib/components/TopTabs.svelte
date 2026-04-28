@@ -4,32 +4,26 @@
 
 	const tabs = [
 		{ label: 'Tracker', path: '/' },
-		{ label: 'History', path: '/history' }
+		{ label: 'History', path: '/history' },
+		{ label: 'Settings', path: '/settings' }
 	];
 
-	function isActive(path: string, currentPath: string) {
-		if (path === '/') return currentPath === '/';
-		return currentPath.startsWith(path);
+	function navigate(event: Event) {
+		const select = event.target as HTMLSelectElement;
+		if (select.value) goto(select.value);
 	}
 </script>
 
-<nav
-	class="flex items-center justify-center gap-1 border-b border-slate-800 bg-slate-950/80 px-4 pt-2 backdrop-blur-md"
->
-	{#each tabs as tab}
-		<button
-			class="relative flex-1 px-4 py-3 text-sm font-medium transition-colors {isActive(
-				tab.path,
-				$page.url.pathname
-			)
-				? 'text-sky-400'
-				: 'text-slate-400 hover:text-slate-200'}"
-			onclick={() => goto(tab.path)}
-		>
-			{tab.label}
-			{#if isActive(tab.path, $page.url.pathname)}
-				<span class="absolute right-0 bottom-0 left-0 h-0.5 rounded-full bg-sky-400"></span>
-			{/if}
-		</button>
-	{/each}
-</nav>
+<div class="fixed left-3 z-50 flex h-11 w-11 items-center justify-center rounded-full bg-white/90 backdrop-blur border border-gray-200/50 dark:bg-slate-800/90 dark:border-slate-700/50" style="top: calc(env(safe-area-inset-top) + 0.75rem)">
+	<svg class="pointer-events-none h-5 w-5 text-gray-500 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+		<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+	</svg>
+	<select
+		class="absolute inset-0 opacity-0"
+		onchange={navigate}
+	>
+		{#each tabs as tab}
+			<option value={tab.path} selected={$page.url.pathname === tab.path || $page.url.pathname.startsWith(tab.path + '/')}>{tab.label}</option>
+		{/each}
+	</select>
+</div>

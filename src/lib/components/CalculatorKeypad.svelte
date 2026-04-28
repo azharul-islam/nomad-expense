@@ -5,7 +5,6 @@
 	let amount = $state('');
 	let note = $state('');
 	let type = $state<'income' | 'expense'>('expense');
-	let paymentMethod = $state<'cash' | 'card'>('cash');
 	let selectedCardId = $state<string | null>(null);
 	let isSubmitting = $state(false);
 	let errorMessage = $state('');
@@ -51,16 +50,7 @@
 		type = newType;
 	}
 
-	function handlePaymentToggle(method: 'cash' | 'card') {
-		paymentMethod = method;
-		if (method === 'cash') {
-			selectedCardId = null;
-		} else if (transactionStore.cards.length > 0 && !selectedCardId) {
-			selectedCardId = transactionStore.cards[0].id;
-		}
-	}
-
-	async function handleSubmit() {
+	async function handleSubmit(method: 'cash' | 'card') {
 		const cents = parseAmountToCents(amount);
 		if (cents <= 0) return;
 
@@ -72,8 +62,8 @@
 				amount: cents,
 				currency: CURRENCY,
 				type,
-				paymentMethod,
-				cardId: paymentMethod === 'card' ? selectedCardId : null,
+				paymentMethod: method,
+				cardId: method === 'card' ? selectedCardId : null,
 				note: note.trim()
 			});
 
@@ -97,17 +87,50 @@
 	function handleTouchEnd(e: TouchEvent) {
 		const diff = touchStartX - e.changedTouches[0].screenX;
 		if (Math.abs(diff) > 50) {
-			type = diff > 0 ? 'income' : 'expense';
+			type = diff > 0 ? 'expense' : 'income';
 		}
 	}
 
 	const displayParts = $derived(formatCurrencyInput(amount));
-</script>
+	</script>
 
-<div class="pb-safe flex shrink-0 flex-col border-t border-slate-800 bg-slate-950" style="touch-action: none;">
+<div class="pb-safe flex shrink-0 flex-col border-t border-gray-200 bg-white dark:border-slate-800 dark:bg-slate-950" style="touch-action: none;">
+	<!-- Card Selector -->
+	<div class="flex gap-2 overflow-x-auto border-b border-gray-200 px-4 py-2 dark:border-slate-800">
+		{#each transactionStore.cards as card}
+			<button
+				class="flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors {selectedCardId ===
+				card.id
+					? 'border-blue-600 bg-blue-50 text-blue-600 dark:border-sky-500 dark:bg-sky-500/10 dark:text-sky-400'
+					: 'border-gray-300 text-gray-500 dark:border-slate-700 dark:text-slate-400'}"
+				style="touch-action: manipulation;"
+				onclick={() => (selectedCardId = selectedCardId === card.id ? null : card.id)}
+			>
+				<span class="h-2 w-2 rounded-full" style="background-color: {card.color}"></span>
+				{card.name}
+			</button>
+		{/each}
+	</div>
+
+	<!-- Note Input -->
+	<div class="flex items-center gap-2 border-b border-gray-200 px-6 py-2 dark:border-slate-800">
+		<svg class="h-4 w-4 shrink-0 text-gray-400 dark:text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+		</svg>
+		<input
+			type="text"
+			placeholder="Add a note..."
+			class="min-w-0 flex-1 bg-transparent text-sm text-gray-800 placeholder-gray-400 outline-none dark:text-slate-200 dark:placeholder-slate-500"
+			bind:value={note}
+		/>
+	</div>
+
 	<!-- Amount Display -->
 	<div
-		class="flex items-center justify-between border-b border-slate-800 px-4 py-3"
+		class="flex items-center justify-between border-b border-gray-200 px-6 py-3 transition-colors duration-300 dark:border-slate-800 {type ===
+		'expense'
+			? 'bg-rose-100 dark:bg-rose-900/40'
+			: 'bg-emerald-100 dark:bg-emerald-900/40'}"
 		ontouchstart={handleTouchStart}
 		ontouchend={handleTouchEnd}
 		aria-label="Swipe left or right to toggle between expense and income"
@@ -117,20 +140,20 @@
 	>
 		<div class="flex items-center gap-3">
 			<!-- Type Toggle -->
-			<div class="flex rounded-lg bg-slate-800 p-0.5">
+			<div class="flex rounded-full bg-white/40 p-0.5 dark:bg-black/20">
 				<button
-					class="rounded-md px-3 py-1.5 text-xs font-medium transition-colors {type === 'expense'
+					class="rounded-full px-4 py-2.5 text-xs font-medium transition-colors {type === 'expense'
 						? 'bg-rose-500 text-white'
-						: 'text-slate-400'}"
+						: 'text-rose-900/40 dark:text-rose-100/40'}"
 					style="touch-action: manipulation;"
 					onclick={() => handleTypeToggle('expense')}
 				>
 					Expense
 				</button>
 				<button
-					class="rounded-md px-3 py-1.5 text-xs font-medium transition-colors {type === 'income'
+					class="rounded-full px-4 py-2.5 text-xs font-medium transition-colors {type === 'income'
 						? 'bg-emerald-500 text-white'
-						: 'text-slate-400'}"
+						: 'text-emerald-900/40 dark:text-emerald-100/40'}"
 					style="touch-action: manipulation;"
 					onclick={() => handleTypeToggle('income')}
 				>
@@ -140,80 +163,31 @@
 		</div>
 
 		<div class="flex items-baseline">
-			<span class="mr-1 text-lg font-semibold text-slate-500">{CURRENCY_SYMBOL}</span><span
-				class="text-3xl font-bold tracking-tight text-white"
+			<span class="mr-1 text-lg font-semibold text-gray-400/40 dark:text-white/20">{CURRENCY_SYMBOL}</span><span
+				class="font-mono text-3xl font-bold tracking-tight text-gray-900 dark:text-white"
 			>{displayParts.integerPart}</span><span
-				class="text-3xl font-bold tracking-tight {displayParts.dotActive ? 'text-white' : 'text-slate-600'}"
+				class="font-mono text-xl font-bold tracking-tight {displayParts.dotActive
+					? 'text-gray-900 dark:text-white'
+					: 'text-gray-400/40 dark:text-white/20'}"
 			>.</span><span
-				class="text-3xl font-bold tracking-tight {displayParts.decimalDigitsEntered >= 1 ? 'text-white' : 'text-slate-600'}"
+				class="font-mono text-xl font-bold tracking-tight {displayParts.decimalDigitsEntered >= 1
+					? 'text-gray-900 dark:text-white'
+					: 'text-gray-400/40 dark:text-white/20'}"
 			>{displayParts.dec1}</span><span
-				class="text-3xl font-bold tracking-tight {displayParts.decimalDigitsEntered >= 2 ? 'text-white' : 'text-slate-600'}"
+				class="font-mono text-xl font-bold tracking-tight {displayParts.decimalDigitsEntered >= 2
+					? 'text-gray-900 dark:text-white'
+					: 'text-gray-400/40 dark:text-white/20'}"
 			>{displayParts.dec2}</span>
 		</div>
 	</div>
 
-	<!-- Note Input -->
-	<div class="border-b border-slate-800 px-4 py-2">
-		<input
-			type="text"
-			placeholder="Add a note..."
-			class="w-full bg-transparent text-sm text-slate-200 placeholder-slate-500 outline-none"
-			bind:value={note}
-		/>
-	</div>
-
-	<!-- Payment Method Toggle -->
-	<div class="flex items-center justify-between border-b border-slate-800 px-4 py-2">
-		<div class="flex rounded-lg bg-slate-800 p-0.5">
-			<button
-				class="rounded-md px-3 py-1.5 text-xs font-medium transition-colors {paymentMethod ===
-				'cash'
-					? 'bg-sky-500 text-white'
-					: 'text-slate-400'}"
-				style="touch-action: manipulation;"
-				onclick={() => handlePaymentToggle('cash')}
-			>
-				Cash
-			</button>
-			<button
-				class="rounded-md px-3 py-1.5 text-xs font-medium transition-colors {paymentMethod ===
-				'card'
-					? 'bg-sky-500 text-white'
-					: 'text-slate-400'}"
-				style="touch-action: manipulation;"
-				onclick={() => handlePaymentToggle('card')}
-			>
-				Card
-			</button>
-		</div>
-
-		<!-- Card Selector (only when card is selected) -->
-		{#if paymentMethod === 'card'}
-			<div class="flex gap-2 overflow-x-auto">
-				{#each transactionStore.cards as card}
-					<button
-						class="flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors {selectedCardId ===
-						card.id
-							? 'border-sky-500 bg-sky-500/10 text-sky-400'
-							: 'border-slate-700 text-slate-400'}"
-						style="touch-action: manipulation;"
-						onclick={() => (selectedCardId = card.id)}
-					>
-						<span class="h-2 w-2 rounded-full" style="background-color: {card.color}"></span>
-						{card.name}
-					</button>
-				{/each}
-			</div>
-		{/if}
-	</div>
-
 	<!-- Keypad Grid -->
-	<div class="grid grid-cols-3 gap-px bg-slate-800">
+	<div class="grid grid-cols-3 bg-white dark:bg-slate-950">
 		{#each digitRows as row}
 			{#each row as digit}
 				{#if digit === 'backspace'}
 					<button
-						class="flex h-16 items-center justify-center bg-slate-950 text-slate-400 transition-colors active:bg-slate-800"
+						class="flex h-16 items-center justify-center bg-white text-gray-500 transition-colors transition-transform duration-200 active:scale-150 active:duration-0 dark:bg-slate-950 dark:text-slate-400"
 						style="touch-action: manipulation;"
 						onpointerdown={handleBackspaceStart}
 						onpointerup={handleBackspaceEnd}
@@ -231,10 +205,10 @@
 					</button>
 				{:else}
 					<button
-						class="flex h-16 items-center justify-center bg-slate-950 text-xl font-medium text-slate-200 transition-colors active:bg-slate-800 {digit ===
+						class="flex h-16 items-center justify-center px-2 bg-white text-xl font-medium text-gray-800 transition-transform duration-200 active:scale-150 active:duration-0 {digit ===
 							'.'
-							? 'text-slate-400'
-							: ''}"
+							? 'text-gray-400 dark:text-slate-400'
+							: ''} dark:bg-slate-950 dark:text-slate-200"
 						style="touch-action: manipulation;"
 						onclick={() => handleDigit(digit)}
 					>
@@ -247,32 +221,44 @@
 
 	<!-- Error Message -->
 	{#if errorMessage}
-		<div class="bg-rose-950/60 px-4 py-2 text-center text-xs font-medium text-rose-400">
+		<div class="bg-rose-50 px-4 py-2 text-center text-xs font-medium text-rose-600 dark:bg-rose-950/60 dark:text-rose-400">
 			{errorMessage}
 		</div>
 	{/if}
 
-	<!-- Add Button -->
-	<button
-		class="flex h-14 w-full items-center justify-center bg-sky-600 text-base font-semibold text-white transition-colors active:bg-sky-700 {parseAmountToCents(
-			amount
-		) <= 0 || isSubmitting
-			? 'opacity-50'
-			: ''}"
-		style="touch-action: manipulation;"
-		onclick={handleSubmit}
-		disabled={parseAmountToCents(amount) <= 0 || isSubmitting}
-	>
-		{#if isSubmitting}
-			<svg class="mr-2 h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-				<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-				<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+	<!-- Add Buttons -->
+	<div class="flex gap-2 px-6 pb-2">
+		<button
+			class="flex h-14 flex-1 items-center justify-center gap-2 rounded-full bg-blue-600 text-base font-semibold text-white transition-colors active:bg-blue-700 dark:bg-sky-600 dark:active:bg-sky-700 {parseAmountToCents(
+				amount
+			) <= 0 || isSubmitting
+				? 'opacity-50'
+				: ''}"
+			style="touch-action: manipulation;"
+			onclick={() => handleSubmit('cash')}
+			disabled={parseAmountToCents(amount) <= 0 || isSubmitting}
+		>
+			<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
 			</svg>
-			Adding...
-		{:else}
-			Add {type === 'income' ? 'Income' : 'Expense'}
-		{/if}
-	</button>
+			Cash
+		</button>
+		<button
+			class="flex h-14 flex-1 items-center justify-center gap-2 rounded-full bg-blue-600 text-base font-semibold text-white transition-colors active:bg-blue-700 dark:bg-sky-600 dark:active:bg-sky-700 {parseAmountToCents(
+				amount
+			) <= 0 || isSubmitting
+				? 'opacity-50'
+				: ''}"
+			style="touch-action: manipulation;"
+			onclick={() => handleSubmit('card')}
+			disabled={parseAmountToCents(amount) <= 0 || isSubmitting}
+		>
+			<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+			</svg>
+			Card
+		</button>
+	</div>
 </div>
 
 <style>

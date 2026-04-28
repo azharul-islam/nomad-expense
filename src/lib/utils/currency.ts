@@ -6,12 +6,20 @@ export const CURRENCY_SYMBOL = 'QR';
  * e.g. formatCurrency(123456) -> "1,234.56"
  */
 export function formatCurrency(cents: number, type?: 'income' | 'expense'): string {
-	const isNegative = type === 'expense' && cents >= 0;
+	const isNegative = cents < 0 || (type === 'expense' && cents >= 0);
 	const absCents = Math.abs(cents);
 	const riyals = Math.floor(absCents / 100);
 	const remainingDirhams = absCents % 100;
 	const formatted = `${riyals.toLocaleString('en-QA')}.${remainingDirhams.toString().padStart(2, '0')}`;
 	return isNegative ? `-${formatted}` : formatted;
+}
+
+/**
+ * Split a currency string into integer and decimal parts.
+ */
+export function splitCurrency(formatted: string): [string, string] {
+	const parts = formatted.split('.');
+	return [parts[0], parts[1] || '00'];
 }
 
 /**
