@@ -19,7 +19,7 @@
 		'#8b5cf6', // violet
 		'#ec4899', // pink
 		'#06b6d4', // cyan
-		'#f97316'  // orange
+		'#f97316' // orange
 	];
 
 	function openAdd() {
@@ -100,8 +100,10 @@
 	}
 </script>
 
-<div class="flex h-full flex-col overflow-hidden bg-gray-100 text-gray-900 dark:bg-slate-950 dark:text-white">
-	<div class="flex-1 overflow-y-auto overscroll-contain px-4 pt-16 pb-4">
+<div
+	class="flex h-full flex-col overflow-hidden bg-gray-100 text-gray-900 dark:bg-slate-950 dark:text-white"
+>
+	<div class="flex-1 overflow-y-auto overscroll-contain px-4 pt-4 pb-4">
 		<button
 			class="mb-4 flex items-center gap-1 text-sm text-blue-600 transition-colors active:text-blue-700 dark:text-sky-400 dark:active:text-sky-300"
 			onclick={() => goto('/settings')}
@@ -119,13 +121,20 @@
 				aria-label="Add card"
 			>
 				<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2"
+						d="M12 4v16m8-8H4"
+					/>
 				</svg>
 			</button>
 		</div>
 
 		{#if transactionStore.cards.length === 0}
-			<div class="flex flex-col items-center justify-center py-16 text-gray-400 dark:text-slate-500">
+			<div
+				class="flex flex-col items-center justify-center py-16 text-gray-400 dark:text-slate-500"
+			>
 				<p class="text-sm">No cards yet</p>
 				<p class="mt-1 text-xs">Tap + to add your first card</p>
 			</div>
@@ -136,13 +145,24 @@
 						class="flex items-center gap-3 rounded-2xl bg-white/80 px-4 py-3.5 text-left shadow-sm transition-colors active:bg-gray-50 dark:bg-slate-800/60 dark:active:bg-slate-700"
 						onclick={() => openEdit(card)}
 					>
-						<span class="h-3 w-3 shrink-0 rounded-full" style="background-color: {card.color}"></span>
+						<span class="h-3 w-3 shrink-0 rounded-full" style="background-color: {card.color}"
+						></span>
 						<div class="min-w-0 flex-1">
 							<p class="text-sm font-medium text-gray-900 dark:text-white">{card.name}</p>
 							<p class="text-xs text-gray-500 dark:text-slate-400">•••• {card.lastFour}</p>
 						</div>
-						<svg class="h-5 w-5 shrink-0 text-gray-400 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+						<svg
+							class="h-5 w-5 shrink-0 text-gray-400 dark:text-slate-400"
+							fill="none"
+							stroke="currentColor"
+							viewBox="0 0 24 24"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M9 5l7 7-7 7"
+							/>
 						</svg>
 					</button>
 				{/each}
@@ -166,41 +186,55 @@
 			</h2>
 
 			{#if errorMessage}
-				<div class="mb-3 rounded-lg bg-rose-50 px-3 py-2 text-xs font-medium text-rose-600 dark:bg-rose-950/60 dark:text-rose-400">
+				<div
+					class="mb-3 rounded-lg bg-rose-50 px-3 py-2 text-xs font-medium text-rose-600 dark:bg-rose-950/60 dark:text-rose-400"
+				>
 					{errorMessage}
 				</div>
 			{/if}
 
 			<div class="mb-3">
-				<label for="card-name" class="mb-1 block text-xs font-medium text-gray-500 dark:text-slate-400">Name</label>
+				<label
+					for="card-name"
+					class="mb-1 block text-xs font-medium text-gray-500 dark:text-slate-400">Name</label
+				>
 				<input
 					id="card-name"
 					type="text"
 					placeholder="e.g. Visa Debit"
-					class="w-full rounded-xl bg-gray-100 px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none ring-1 ring-gray-200 focus:ring-blue-500 dark:bg-slate-800 dark:text-white dark:placeholder-slate-500 dark:ring-slate-700 dark:focus:ring-sky-500"
+					class="w-full rounded-xl bg-gray-100 px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 ring-1 ring-gray-200 outline-none focus:ring-blue-500 dark:bg-slate-800 dark:text-white dark:placeholder-slate-500 dark:ring-slate-700 dark:focus:ring-sky-500"
 					bind:value={cardName}
 				/>
 			</div>
 
 			<div class="mb-3">
-				<label for="card-last-four" class="mb-1 block text-xs font-medium text-gray-500 dark:text-slate-400">Last Four Digits</label>
+				<label
+					for="card-last-four"
+					class="mb-1 block text-xs font-medium text-gray-500 dark:text-slate-400"
+					>Last Four Digits</label
+				>
 				<input
 					id="card-last-four"
 					type="text"
 					inputmode="numeric"
 					maxlength="4"
 					placeholder="0000"
-					class="w-full rounded-xl bg-gray-100 px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none ring-1 ring-gray-200 focus:ring-blue-500 dark:bg-slate-800 dark:text-white dark:placeholder-slate-500 dark:ring-slate-700 dark:focus:ring-sky-500"
+					class="w-full rounded-xl bg-gray-100 px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 ring-1 ring-gray-200 outline-none focus:ring-blue-500 dark:bg-slate-800 dark:text-white dark:placeholder-slate-500 dark:ring-slate-700 dark:focus:ring-sky-500"
 					bind:value={cardLastFour}
 				/>
 			</div>
 
 			<div class="mb-5">
-				<label for="card-color" class="mb-2 block text-xs font-medium text-gray-500 dark:text-slate-400">Color</label>
+				<label
+					for="card-color"
+					class="mb-2 block text-xs font-medium text-gray-500 dark:text-slate-400">Color</label
+				>
 				<div id="card-color" class="flex flex-wrap gap-2">
 					{#each presetColors as color}
 						<button
-							class="h-8 w-8 rounded-full ring-2 transition-all {cardColor === color ? 'ring-gray-900 scale-110 dark:ring-white' : 'ring-transparent'}"
+							class="h-8 w-8 rounded-full ring-2 transition-all {cardColor === color
+								? 'scale-110 ring-gray-900 dark:ring-white'
+								: 'ring-transparent'}"
 							style="background-color: {color}"
 							onclick={() => (cardColor = color)}
 							aria-label="Select color {color}"
@@ -211,7 +245,9 @@
 
 			<div class="flex gap-2">
 				<button
-					class="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white transition-colors active:bg-blue-700 dark:bg-sky-600 dark:active:bg-sky-700 {isSaving ? 'opacity-60' : ''}"
+					class="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white transition-colors active:bg-blue-700 dark:bg-sky-600 dark:active:bg-sky-700 {isSaving
+						? 'opacity-60'
+						: ''}"
 					onclick={saveCard}
 					disabled={isSaving}
 				>

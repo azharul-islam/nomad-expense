@@ -18,6 +18,12 @@ __pycache__/
 /.svelte-kit
 /build
 
+# Firebase hosting cache
+.firebase/
+
+# Harness session artifacts
+.omo/
+
 # OS
 .DS_Store
 Thumbs.db

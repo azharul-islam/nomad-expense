@@ -9,11 +9,22 @@ const config = {
 		}
 	},
 	kit: {
+		// Absolute asset paths in prerendered pages — required so the PWA's service
+		// worker navigation fallback works on deep/dynamic offline routes.
+		paths: { relative: false },
 		adapter: adapter({
 			fallback: 'index.html'
 		}),
 		prerender: {
-			entries: ['/']
+			entries: [
+				'/',
+				'/add',
+				'/history',
+				'/settings',
+				'/settings/appearance',
+				'/settings/cards',
+				'/settings/data'
+			]
 		}
 	}
 };

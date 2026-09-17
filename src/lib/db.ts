@@ -1,6 +1,7 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 
-function generateUUID(): string {
+/** UUID generator with a fallback for non-secure contexts. */
+export function generateUUID(): string {
 	if (typeof crypto !== 'undefined' && crypto.randomUUID) {
 		return crypto.randomUUID();
 	}
@@ -30,6 +31,40 @@ export interface Card {
 	color: string;
 }
 
+export interface Person {
+	id: string;
+	name: string;
+	/** Lowercased/trimmed name used to prevent duplicate people. */
+	nameKey: string;
+	color: string;
+	createdAt: number;
+}
+
+export type LoanDirection = 'lent' | 'borrowed';
+
+export interface Loan {
+	id: string;
+	personId: string;
+	/** 'lent' = you gave money out; 'borrowed' = you took money in. */
+	direction: LoanDirection;
+	/** Principal, positive, in the smallest unit (cents). */
+	amount: number;
+	currency: string;
+	note: string;
+	dueDate: number | null;
+	createdAt: number;
+}
+
+export interface LoanPayment {
+	id: string;
+	loanId: string;
+	personId: string;
+	/** Repayment amount, positive, in the smallest unit (cents). */
+	amount: number;
+	note: string;
+	createdAt: number;
+}
+
 interface ExpenseDB extends DBSchema {
 	transactions: {
 		key: string;
@@ -40,36 +75,55 @@ interface ExpenseDB extends DBSchema {
 		key: string;
 		value: Card;
 	};
+	people: {
+		key: string;
+		value: Person;
+		indexes: { 'by-name': string };
+	};
+	loans: {
+		key: string;
+		value: Loan;
+		indexes: { 'by-person': string; 'by-date': number };
+	};
+	loanPayments: {
+		key: string;
+		value: LoanPayment;
+		indexes: { 'by-loan': string; 'by-person': string };
+	};
 }
 
 const DB_NAME = 'expense-tracker';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let dbPromise: Promise<IDBPDatabase<ExpenseDB>> | null = null;
 
 function getDB(): Promise<IDBPDatabase<ExpenseDB>> {
 	if (dbPromise) return dbPromise;
 	dbPromise = openDB<ExpenseDB>(DB_NAME, DB_VERSION, {
-		upgrade(db) {
-			const txStore = db.createObjectStore('transactions', { keyPath: 'id' });
-			txStore.createIndex('by-date', 'createdAt', { unique: false });
+		// Additive migration: existing stores are only created for fresh installs,
+		// so upgrading from v1 keeps every transaction and card untouched.
+		upgrade(db, oldVersion) {
+			if (oldVersion < 1) {
+				const txStore = db.createObjectStore('transactions', { keyPath: 'id' });
+				txStore.createIndex('by-date', 'createdAt', { unique: false });
+				db.createObjectStore('cards', { keyPath: 'id' });
+			}
 
-			db.createObjectStore('cards', { keyPath: 'id' });
+			if (oldVersion < 2) {
+				const people = db.createObjectStore('people', { keyPath: 'id' });
+				people.createIndex('by-name', 'nameKey', { unique: false });
+
+				const loans = db.createObjectStore('loans', { keyPath: 'id' });
+				loans.createIndex('by-person', 'personId', { unique: false });
+				loans.createIndex('by-date', 'createdAt', { unique: false });
+
+				const payments = db.createObjectStore('loanPayments', { keyPath: 'id' });
+				payments.createIndex('by-loan', 'loanId', { unique: false });
+				payments.createIndex('by-person', 'personId', { unique: false });
+			}
 		}
 	});
 	return dbPromise;
-}
-
-export async function resetDB(): Promise<void> {
-	if (dbPromise) {
-		try {
-			const db = await dbPromise;
-			db.close();
-		} catch {
-			// ignore
-		}
-		dbPromise = null;
-	}
 }
 
 export async function getAllTransactions(): Promise<Transaction[]> {
@@ -109,113 +163,6 @@ export async function deleteTransaction(id: string): Promise<boolean> {
 	return true;
 }
 
-export async function getTransactions(
-	options: { cursor?: number; limit?: number; direction?: 'prev' | 'next' } = {}
-): Promise<{ items: Transaction[]; nextCursor: number | null }> {
-	const db = await getDB();
-	const limit = options.limit ?? 50;
-	const direction = options.direction ?? 'prev';
-
-	const tx = db.transaction('transactions', 'readonly');
-	const store = tx.objectStore('transactions');
-	const index = store.index('by-date');
-
-	const items: Transaction[] = [];
-	let cursor: ReturnType<typeof index.openCursor>;
-
-	if (options.cursor != null) {
-		if (direction === 'prev') {
-			cursor = index.openCursor(IDBKeyRange.upperBound(options.cursor, true), direction);
-		} else {
-			cursor = index.openCursor(IDBKeyRange.lowerBound(options.cursor, true), direction);
-		}
-	} else {
-		cursor = index.openCursor(null, direction);
-	}
-
-	let result = await cursor;
-	while (result && items.length < limit) {
-		items.push(result.value);
-		result = await result.continue();
-	}
-
-	// If we got fewer items than limit, there's no more data
-	const nextCursor = items.length < limit ? null : (items[items.length - 1]?.createdAt ?? null);
-
-	return { items, nextCursor };
-}
-
-export async function getTransactionsByDateRange(
-	start: number,
-	end: number,
-	options: { limit?: number; offset?: number } = {}
-): Promise<Transaction[]> {
-	const db = await getDB();
-	const limit = options.limit ?? 100;
-	const offset = options.offset ?? 0;
-
-	const index = db.transaction('transactions').store.index('by-date');
-	const range = IDBKeyRange.bound(start, end);
-	let cursor = await index.openCursor(range, 'prev');
-
-	const items: Transaction[] = [];
-	let skipped = 0;
-
-	while (cursor) {
-		if (skipped < offset) {
-			skipped++;
-		} else if (items.length < limit) {
-			items.push(cursor.value);
-		} else {
-			break;
-		}
-		cursor = await cursor.continue();
-	}
-
-	return items;
-}
-
-export async function getBalance(currency: string = 'QAR'): Promise<number> {
-	const db = await getDB();
-	const tx = db.transaction('transactions', 'readonly');
-	const store = tx.store;
-	let cursor = await store.openCursor();
-
-	let balance = 0;
-	while (cursor) {
-		const item = cursor.value;
-		if (item.currency === currency) {
-			balance += item.type === 'income' ? item.amount : -item.amount;
-		}
-		cursor = await cursor.continue();
-	}
-
-	return balance;
-}
-
-export async function getTotals(currency: string = 'QAR'): Promise<{ income: number; expense: number }> {
-	const db = await getDB();
-	const tx = db.transaction('transactions', 'readonly');
-	const store = tx.store;
-	let cursor = await store.openCursor();
-
-	let income = 0;
-	let expense = 0;
-	while (cursor) {
-		const item = cursor.value;
-		if (item.currency === currency) {
-			if (item.type === 'income') {
-				income += item.amount;
-			} else {
-				expense += item.amount;
-			}
-		}
-		cursor = await cursor.continue();
-	}
-
-	return { income, expense };
-}
-
 // Card management
 export async function getCards(): Promise<Card[]> {
 	const db = await getDB();
@@ -224,7 +171,7 @@ export async function getCards(): Promise<Card[]> {
 
 export async function addCard(card: Omit<Card, 'id'>): Promise<Card> {
 	const db = await getDB();
-	const newCard: Card = { ...card, id: crypto.randomUUID() };
+	const newCard: Card = { ...card, id: generateUUID() };
 	await db.put('cards', newCard);
 	return newCard;
 }
@@ -271,9 +218,7 @@ export async function isStoragePersisted(): Promise<boolean> {
 	return false;
 }
 
-export async function bulkAddTransactions(
-	transactions: Transaction[]
-): Promise<void> {
+export async function bulkAddTransactions(transactions: Transaction[]): Promise<void> {
 	const db = await getDB();
 	const tx = db.transaction('transactions', 'readwrite');
 	for (const transaction of transactions) {
@@ -299,4 +244,132 @@ export async function clearAllTransactions(): Promise<void> {
 export async function clearAllCards(): Promise<void> {
 	const db = await getDB();
 	await db.clear('cards');
+}
+// ---- People ----
+export async function getAllPeople(): Promise<Person[]> {
+	const db = await getDB();
+	const items = await db.getAll('people');
+	return items.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export async function addPerson(person: Omit<Person, 'id'>): Promise<Person> {
+	const db = await getDB();
+	const newPerson: Person = { ...person, id: generateUUID() };
+	await db.put('people', newPerson);
+	return newPerson;
+}
+
+export async function updatePerson(
+	id: string,
+	updates: Partial<Omit<Person, 'id'>>
+): Promise<Person | null> {
+	const db = await getDB();
+	const existing = await db.get('people', id);
+	if (!existing) return null;
+	const updated = { ...existing, ...updates };
+	await db.put('people', updated);
+	return updated;
+}
+
+export async function deletePerson(id: string): Promise<void> {
+	const db = await getDB();
+	await db.delete('people', id);
+}
+
+export async function bulkAddPeople(people: Person[]): Promise<void> {
+	const db = await getDB();
+	const tx = db.transaction('people', 'readwrite');
+	for (const person of people) await tx.store.put(person);
+	await tx.done;
+}
+
+export async function clearAllPeople(): Promise<void> {
+	const db = await getDB();
+	await db.clear('people');
+}
+
+// ---- Loans ----
+export async function getAllLoans(): Promise<Loan[]> {
+	const db = await getDB();
+	const items = await db.getAll('loans');
+	return items.sort((a, b) => b.createdAt - a.createdAt);
+}
+
+export async function addLoan(loan: Omit<Loan, 'id'>): Promise<Loan> {
+	const db = await getDB();
+	const newLoan: Loan = { ...loan, id: generateUUID() };
+	await db.put('loans', newLoan);
+	return newLoan;
+}
+
+export async function updateLoan(
+	id: string,
+	updates: Partial<Omit<Loan, 'id'>>
+): Promise<Loan | null> {
+	const db = await getDB();
+	const existing = await db.get('loans', id);
+	if (!existing) return null;
+	const updated = { ...existing, ...updates };
+	await db.put('loans', updated);
+	return updated;
+}
+
+export async function deleteLoan(id: string): Promise<void> {
+	const db = await getDB();
+	await db.delete('loans', id);
+}
+
+export async function bulkAddLoans(loans: Loan[]): Promise<void> {
+	const db = await getDB();
+	const tx = db.transaction('loans', 'readwrite');
+	for (const loan of loans) await tx.store.put(loan);
+	await tx.done;
+}
+
+export async function clearAllLoans(): Promise<void> {
+	const db = await getDB();
+	await db.clear('loans');
+}
+
+// ---- Loan payments ----
+export async function getAllLoanPayments(): Promise<LoanPayment[]> {
+	const db = await getDB();
+	const items = await db.getAll('loanPayments');
+	return items.sort((a, b) => b.createdAt - a.createdAt);
+}
+
+export async function addLoanPayment(payment: Omit<LoanPayment, 'id'>): Promise<LoanPayment> {
+	const db = await getDB();
+	const newPayment: LoanPayment = { ...payment, id: generateUUID() };
+	await db.put('loanPayments', newPayment);
+	return newPayment;
+}
+
+export async function updateLoanPayment(
+	id: string,
+	updates: Partial<Omit<LoanPayment, 'id'>>
+): Promise<LoanPayment | null> {
+	const db = await getDB();
+	const existing = await db.get('loanPayments', id);
+	if (!existing) return null;
+	const updated = { ...existing, ...updates };
+	await db.put('loanPayments', updated);
+	return updated;
+}
+
+export async function deleteLoanPayment(id: string): Promise<void> {
+	const db = await getDB();
+	await db.delete('loanPayments', id);
+}
+
+export async function bulkAddLoanPayments(payments: LoanPayment[]): Promise<void> {
+	const db = await getDB();
+	const tx = db.transaction('loanPayments', 'readwrite');
+	for (const payment of payments) await tx.store.put(payment);
+	await tx.done;
+}
+
+export async function clearAllLoanPayments(): Promise<void> {
+	const db = await getDB();
+	await db.clear('loanPayments');
 }

@@ -7,3 +7,6 @@ bun.lockb
 
 # Miscellaneous
 /static/
+
+# Harness session artifacts (not project code)
+/.omo/

@@ -33,10 +33,16 @@ export default defineConfig({
 				]
 			},
 			workbox: {
-				globPatterns: ['client/**/*.{js,css,ico,png,svg,webp,webmanifest}']
+				globPatterns: ['client/**/*.{js,css,ico,png,svg,webp,webmanifest,ttf,woff2}'],
+				// The custom font is ~4.8 MB — allow it in the precache for offline use.
+				maximumFileSizeToCacheInBytes: 8 * 1024 * 1024
 			},
 			kit: {
-				includeVersionFile: true
+				includeVersionFile: true,
+				// SPA fallback: precache the route-agnostic shell and use it for the
+				// service worker navigation fallback so deep/dynamic URLs hydrate correctly.
+				adapterFallback: 'index.html',
+				spa: true
 			}
 		})
 	],

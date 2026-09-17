@@ -52,11 +52,11 @@
 			<p class="text-sm text-gray-500 dark:text-slate-400">
 				{tx.paymentMethod === 'card' ? 'Card' : 'Cash'}
 				{#if tx.cardId}
-				{#each transactionStore.cards as card (card.id)}
-					{#if card.id === tx.cardId}
-						· {card.name}
-					{/if}
-				{/each}
+					{#each transactionStore.cards as card (card.id)}
+						{#if card.id === tx.cardId}
+							· {card.name}
+						{/if}
+					{/each}
 				{/if}
 			</p>
 		{/if}
@@ -101,6 +101,4 @@
 	>
 		{tx.type === 'expense' ? '-' : '+'}<span class="font-mono">{formatCurrency(tx.amount)}</span>
 	</span>
-
-
 </div>

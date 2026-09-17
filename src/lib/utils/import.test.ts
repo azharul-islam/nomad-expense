@@ -38,10 +38,7 @@ describe('parseCSV', () => {
 
 	describe('basic parsing', () => {
 		it('parses a single valid transaction', async () => {
-			const file = makeCSV([
-				validHeader,
-				'2024-03-15 14:30,expense,250.00,QAR,cash,N/A,Groceries'
-			]);
+			const file = makeCSV([validHeader, '2024-03-15 14:30,expense,250.00,QAR,cash,N/A,Groceries']);
 			const result = await parseCSV(file);
 
 			expect(result.errors).toHaveLength(0);
@@ -54,10 +51,7 @@ describe('parseCSV', () => {
 		});
 
 		it('parses income transactions', async () => {
-			const file = makeCSV([
-				validHeader,
-				'2024-03-15 14:30,income,5000.00,QAR,cash,N/A,Salary'
-			]);
+			const file = makeCSV([validHeader, '2024-03-15 14:30,income,5000.00,QAR,cash,N/A,Salary']);
 			const result = await parseCSV(file);
 
 			expect(result.transactions[0].type).toBe('income');
@@ -90,40 +84,28 @@ describe('parseCSV', () => {
 
 	describe('amount parsing', () => {
 		it('converts decimal amounts to cents correctly', async () => {
-			const file = makeCSV([
-				validHeader,
-				'2024-01-01 00:00,expense,1234.56,QAR,cash,N/A,'
-			]);
+			const file = makeCSV([validHeader, '2024-01-01 00:00,expense,1234.56,QAR,cash,N/A,']);
 			const result = await parseCSV(file);
 
 			expect(result.transactions[0].amount).toBe(123456);
 		});
 
 		it('handles whole number amounts', async () => {
-			const file = makeCSV([
-				validHeader,
-				'2024-01-01 00:00,expense,100,QAR,cash,N/A,'
-			]);
+			const file = makeCSV([validHeader, '2024-01-01 00:00,expense,100,QAR,cash,N/A,']);
 			const result = await parseCSV(file);
 
 			expect(result.transactions[0].amount).toBe(10000);
 		});
 
 		it('handles small decimal amounts', async () => {
-			const file = makeCSV([
-				validHeader,
-				'2024-01-01 00:00,expense,0.50,QAR,cash,N/A,'
-			]);
+			const file = makeCSV([validHeader, '2024-01-01 00:00,expense,0.50,QAR,cash,N/A,']);
 			const result = await parseCSV(file);
 
 			expect(result.transactions[0].amount).toBe(50);
 		});
 
 		it('rejects zero amount', async () => {
-			const file = makeCSV([
-				validHeader,
-				'2024-01-01 00:00,expense,0,QAR,cash,N/A,'
-			]);
+			const file = makeCSV([validHeader, '2024-01-01 00:00,expense,0,QAR,cash,N/A,']);
 			const result = await parseCSV(file);
 
 			expect(result.errors).toHaveLength(1);
@@ -131,10 +113,7 @@ describe('parseCSV', () => {
 		});
 
 		it('rejects negative amounts', async () => {
-			const file = makeCSV([
-				validHeader,
-				'2024-01-01 00:00,expense,-50.00,QAR,cash,N/A,'
-			]);
+			const file = makeCSV([validHeader, '2024-01-01 00:00,expense,-50.00,QAR,cash,N/A,']);
 			const result = await parseCSV(file);
 
 			expect(result.errors).toHaveLength(1);
@@ -142,10 +121,7 @@ describe('parseCSV', () => {
 		});
 
 		it('rejects non-numeric amounts', async () => {
-			const file = makeCSV([
-				validHeader,
-				'2024-01-01 00:00,expense,abc,QAR,cash,N/A,'
-			]);
+			const file = makeCSV([validHeader, '2024-01-01 00:00,expense,abc,QAR,cash,N/A,']);
 			const result = await parseCSV(file);
 
 			expect(result.errors).toHaveLength(1);
@@ -155,23 +131,15 @@ describe('parseCSV', () => {
 
 	describe('date parsing', () => {
 		it('parses ISO-like date format', async () => {
-			const file = makeCSV([
-				validHeader,
-				'2024-03-15 14:30,expense,100.00,QAR,cash,N/A,'
-			]);
+			const file = makeCSV([validHeader, '2024-03-15 14:30,expense,100.00,QAR,cash,N/A,']);
 			const result = await parseCSV(file);
 
 			expect(result.summary.dateRange).not.toBeNull();
-			expect(result.summary.dateRange!.earliest).toBe(
-				new Date('2024-03-15T14:30:00').getTime()
-			);
+			expect(result.summary.dateRange!.earliest).toBe(new Date('2024-03-15T14:30:00').getTime());
 		});
 
 		it('rejects invalid dates', async () => {
-			const file = makeCSV([
-				validHeader,
-				'not-a-date,expense,100.00,QAR,cash,N/A,'
-			]);
+			const file = makeCSV([validHeader, 'not-a-date,expense,100.00,QAR,cash,N/A,']);
 			const result = await parseCSV(file);
 
 			expect(result.errors).toHaveLength(1);
@@ -187,41 +155,28 @@ describe('parseCSV', () => {
 			]);
 			const result = await parseCSV(file);
 
-			expect(result.summary.dateRange!.earliest).toBe(
-				new Date('2024-01-01T00:00:00').getTime()
-			);
-			expect(result.summary.dateRange!.latest).toBe(
-				new Date('2024-06-15T12:00:00').getTime()
-			);
+			expect(result.summary.dateRange!.earliest).toBe(new Date('2024-01-01T00:00:00').getTime());
+			expect(result.summary.dateRange!.latest).toBe(new Date('2024-06-15T12:00:00').getTime());
 		});
 	});
 
 	describe('type validation', () => {
 		it('accepts lowercase expense', async () => {
-			const file = makeCSV([
-				validHeader,
-				'2024-01-01 00:00,expense,100.00,QAR,cash,N/A,'
-			]);
+			const file = makeCSV([validHeader, '2024-01-01 00:00,expense,100.00,QAR,cash,N/A,']);
 			const result = await parseCSV(file);
 
 			expect(result.transactions[0].type).toBe('expense');
 		});
 
 		it('accepts lowercase income', async () => {
-			const file = makeCSV([
-				validHeader,
-				'2024-01-01 00:00,income,100.00,QAR,cash,N/A,'
-			]);
+			const file = makeCSV([validHeader, '2024-01-01 00:00,income,100.00,QAR,cash,N/A,']);
 			const result = await parseCSV(file);
 
 			expect(result.transactions[0].type).toBe('income');
 		});
 
 		it('rejects invalid type', async () => {
-			const file = makeCSV([
-				validHeader,
-				'2024-01-01 00:00,transfer,100.00,QAR,cash,N/A,'
-			]);
+			const file = makeCSV([validHeader, '2024-01-01 00:00,transfer,100.00,QAR,cash,N/A,']);
 			const result = await parseCSV(file);
 
 			expect(result.errors).toHaveLength(1);
@@ -244,20 +199,14 @@ describe('parseCSV', () => {
 		});
 
 		it('does not extract N/A as a card', async () => {
-			const file = makeCSV([
-				validHeader,
-				'2024-01-01 00:00,expense,100.00,QAR,cash,N/A,'
-			]);
+			const file = makeCSV([validHeader, '2024-01-01 00:00,expense,100.00,QAR,cash,N/A,']);
 			const result = await parseCSV(file);
 
 			expect(result.cards).toHaveLength(0);
 		});
 
 		it('does not extract Unknown as a card', async () => {
-			const file = makeCSV([
-				validHeader,
-				'2024-01-01 00:00,expense,100.00,QAR,card,Unknown,'
-			]);
+			const file = makeCSV([validHeader, '2024-01-01 00:00,expense,100.00,QAR,card,Unknown,']);
 			const result = await parseCSV(file);
 
 			expect(result.cards).toHaveLength(0);
@@ -276,10 +225,7 @@ describe('parseCSV', () => {
 		});
 
 		it('sets default card properties', async () => {
-			const file = makeCSV([
-				validHeader,
-				'2024-01-01 00:00,expense,100.00,QAR,card,My Card,'
-			]);
+			const file = makeCSV([validHeader, '2024-01-01 00:00,expense,100.00,QAR,card,My Card,']);
 			const result = await parseCSV(file);
 
 			expect(result.cards[0].lastFour).toBe('0000');
@@ -311,30 +257,21 @@ describe('parseCSV', () => {
 
 	describe('partial data', () => {
 		it('defaults currency to QAR when missing', async () => {
-			const file = makeCSV([
-				'Date,Type,Amount',
-				'2024-01-01 00:00,expense,100.00'
-			]);
+			const file = makeCSV(['Date,Type,Amount', '2024-01-01 00:00,expense,100.00']);
 			const result = await parseCSV(file);
 
 			expect(result.transactions[0].currency).toBe('QAR');
 		});
 
 		it('defaults payment method to cash when missing', async () => {
-			const file = makeCSV([
-				'Date,Type,Amount',
-				'2024-01-01 00:00,expense,100.00'
-			]);
+			const file = makeCSV(['Date,Type,Amount', '2024-01-01 00:00,expense,100.00']);
 			const result = await parseCSV(file);
 
 			expect(result.transactions[0].paymentMethod).toBe('cash');
 		});
 
 		it('defaults note to empty when missing', async () => {
-			const file = makeCSV([
-				'Date,Type,Amount',
-				'2024-01-01 00:00,expense,100.00'
-			]);
+			const file = makeCSV(['Date,Type,Amount', '2024-01-01 00:00,expense,100.00']);
 			const result = await parseCSV(file);
 
 			expect(result.transactions[0].note).toBe('');
@@ -357,20 +294,14 @@ describe('parseCSV', () => {
 		});
 
 		it('reports row numbers in errors', async () => {
-			const file = makeCSV([
-				validHeader,
-				'bad-date,expense,100.00,QAR,cash,N/A,'
-			]);
+			const file = makeCSV([validHeader, 'bad-date,expense,100.00,QAR,cash,N/A,']);
 			const result = await parseCSV(file);
 
 			expect(result.errors[0]).toContain('Row 2');
 		});
 
 		it('handles missing fields in a row', async () => {
-			const file = makeCSV([
-				validHeader,
-				'2024-01-01 00:00,expense,'
-			]);
+			const file = makeCSV([validHeader, '2024-01-01 00:00,expense,']);
 			const result = await parseCSV(file);
 
 			expect(result.errors).toHaveLength(1);
@@ -402,10 +333,7 @@ describe('parseCSV', () => {
 		});
 
 		it('returns null dateRange for no valid transactions', async () => {
-			const file = makeCSV([
-				validHeader,
-				'bad-date,expense,100.00,QAR,cash,N/A,'
-			]);
+			const file = makeCSV([validHeader, 'bad-date,expense,100.00,QAR,cash,N/A,']);
 			const result = await parseCSV(file);
 
 			expect(result.summary.dateRange).toBeNull();

@@ -1,8 +1,19 @@
-import type { Transaction, Card } from '$lib/db';
+import type { Transaction, Card, Person, Loan, LoanPayment } from '$lib/db';
+
+/** Complete backup format (v2). Legacy CSV exports remain supported and unchanged. */
+export interface BackupFile {
+	version: 2;
+	exportedAt: number;
+	transactions: Transaction[];
+	cards: Card[];
+	people: Person[];
+	loans: Loan[];
+	payments: LoanPayment[];
+}
 
 function escapeCSV(value: string): string {
 	if (value.includes(',') || value.includes('"') || value.includes('\n')) {
-		return `"${value.replace(/"/g, '""')}"`;
+		return '"' + value.replace(/"/g, '""') + '"';
 	}
 	return value;
 }
@@ -14,17 +25,14 @@ function formatDate(timestamp: number): string {
 	const day = String(date.getDate()).padStart(2, '0');
 	const hours = String(date.getHours()).padStart(2, '0');
 	const minutes = String(date.getMinutes()).padStart(2, '0');
-	return `${year}-${month}-${day} ${hours}:${minutes}`;
+	return year + '-' + month + '-' + day + ' ' + hours + ':' + minutes;
 }
 
 function formatAmount(cents: number): string {
 	return (cents / 100).toFixed(2);
 }
 
-export function exportToCSV(
-	transactions: Transaction[],
-	cards: Card[]
-): string {
+export function exportToCSV(transactions: Transaction[], cards: Card[]): string {
 	const cardMap = new Map<string, string>();
 	for (const card of cards) {
 		cardMap.set(card.id, card.name);
@@ -50,8 +58,13 @@ export function exportToCSV(
 	return rows.join('\n');
 }
 
-export function downloadCSV(content: string, filename: string): void {
-	const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+/** Full JSON backup of every entity type (transactions, cards, people, loans, payments). */
+export function exportToBackup(backup: BackupFile): string {
+	return JSON.stringify(backup, null, 2);
+}
+
+function download(content: string, filename: string, type: string): void {
+	const blob = new Blob([content], { type });
 	const url = URL.createObjectURL(blob);
 	const link = document.createElement('a');
 	link.href = url;
@@ -61,4 +74,12 @@ export function downloadCSV(content: string, filename: string): void {
 	link.click();
 	document.body.removeChild(link);
 	URL.revokeObjectURL(url);
+}
+
+export function downloadCSV(content: string, filename: string): void {
+	download(content, filename, 'text/csv;charset=utf-8;');
+}
+
+export function downloadJSON(content: string, filename: string): void {
+	download(content, filename, 'application/json;charset=utf-8;');
 }

@@ -2,7 +2,6 @@ import {
 	addTransaction,
 	updateTransaction,
 	deleteTransaction,
-	getTransactions,
 	getAllTransactions,
 	getCards,
 	seedDefaultCards,
@@ -11,11 +10,11 @@ import {
 	deleteCard as dbDeleteCard,
 	requestPersistentStorage,
 	isStoragePersisted,
-	resetDB,
 	bulkAddTransactions,
 	bulkAddCards,
 	clearAllTransactions,
 	clearAllCards,
+	generateUUID,
 	type Transaction,
 	type Card
 } from './db';
@@ -25,17 +24,8 @@ class TransactionStore {
 	cards = $state<Card[]>([]);
 	loading = $state(false);
 	initialized = $state(false);
-	hasMore = $state(true);
-	private cursor: number | null = null;
 	private currency = 'QAR';
 	private initPromise: Promise<void> | null = null;
-
-	balance = $derived(
-		this.transactions.reduce((sum, t) => {
-			if (t.currency !== this.currency) return sum;
-			return sum + (t.type === 'income' ? t.amount : -t.amount);
-		}, 0)
-	);
 
 	private totals = $derived.by(() => {
 		let income = 0;
@@ -50,6 +40,12 @@ class TransactionStore {
 
 	incomeTotal = $derived(this.totals.income);
 	expenseTotal = $derived(this.totals.expense);
+
+	/**
+	 * Tracker balance: income − expense for the primary currency only.
+	 * Loans are deliberately excluded — they have their own balances on the Loans tab.
+	 */
+	netBalance = $derived(this.incomeTotal - this.expenseTotal);
 
 	init(): Promise<void> {
 		if (this.initialized) return Promise.resolve();
@@ -67,8 +63,6 @@ class TransactionStore {
 			await this.loadCards();
 			const all = await getAllTransactions();
 			this.transactions = all;
-			this.hasMore = false;
-			this.cursor = null;
 			this.initialized = true;
 		} catch (err) {
 			console.error('Store init failed:', err);
@@ -78,57 +72,6 @@ class TransactionStore {
 			this.loading = false;
 			this.initPromise = null;
 		}
-	}
-
-	private reloading = false;
-	async reload() {
-		if (this.reloading) return;
-		this.reloading = true;
-		try {
-			this.initialized = false;
-			this.transactions = [];
-			this.cursor = null;
-			this.hasMore = true;
-			await resetDB();
-			await this.init();
-		} finally {
-			this.reloading = false;
-		}
-	}
-
-	async loadTransactions(reset = false) {
-		if (this.loading) return;
-		this.loading = true;
-
-		try {
-			if (reset) {
-				this.cursor = null;
-				this.transactions = [];
-				this.hasMore = true;
-			}
-
-			const { items, nextCursor } = await getTransactions({
-				cursor: this.cursor ?? undefined,
-				limit: 50,
-				direction: 'prev'
-			});
-
-			if (reset) {
-				this.transactions = items;
-			} else {
-				this.transactions = [...this.transactions, ...items];
-			}
-
-			this.cursor = nextCursor;
-			this.hasMore = nextCursor !== null;
-		} finally {
-			this.loading = false;
-		}
-	}
-
-	async loadMore() {
-		if (!this.hasMore || this.loading) return;
-		await this.loadTransactions();
 	}
 
 	async add(tx: Parameters<typeof addTransaction>[0]) {
@@ -197,6 +140,10 @@ class TransactionStore {
 		cards: Omit<Card, 'id'>[],
 		mode: 'replace' | 'append'
 	) {
+		// Ensure the store is loaded so existing cards/transactions are known
+		// before deciding what to merge (prevents duplicates on append).
+		await this.init();
+
 		if (mode === 'replace') {
 			await clearAllTransactions();
 			await clearAllCards();
@@ -204,35 +151,37 @@ class TransactionStore {
 			this.cards = [];
 		}
 
-		const cardMap = new Map<string, string>();
-
-		if (cards.length > 0) {
-			const newCards: Card[] = cards.map((c) => ({
-				...c,
-				id: crypto.randomUUID()
-			}));
-			await bulkAddCards(newCards);
-			for (const card of newCards) {
-				cardMap.set(card.name, card.id);
-			}
-			this.cards = [...this.cards, ...newCards];
+		// Merge incoming cards into the existing set by name — appending a backup
+		// must not grow the card list with re-created duplicates.
+		const cardByName = new Map<string, string>();
+		for (const card of this.cards) {
+			cardByName.set(card.name, card.id);
 		}
 
-		const existingCardMap = new Map<string, string>();
-		for (const card of this.cards) {
-			existingCardMap.set(card.name, card.id);
+		const newCards: Card[] = [];
+		for (const incoming of cards) {
+			if (cardByName.has(incoming.name)) continue;
+			const created: Card = { ...incoming, id: generateUUID() };
+			newCards.push(created);
+			cardByName.set(incoming.name, created.id);
+		}
+		if (newCards.length > 0) {
+			await bulkAddCards(newCards);
+			this.cards = [...this.cards, ...newCards];
 		}
 
 		const transactionsWithIds: Transaction[] = transactions.map((tx) => {
 			let cardId: string | null = null;
 			const txCardName = (tx as { cardName?: string }).cardName;
 			if (tx.paymentMethod === 'card' && txCardName) {
-				cardId = existingCardMap.get(txCardName) || cardMap.get(txCardName) || null;
+				cardId = cardByName.get(txCardName) || null;
 			}
+			const withId = tx as Transaction;
 			return {
 				...tx,
-				id: crypto.randomUUID(),
-				createdAt: Date.now(),
+				id: generateUUID(),
+				// Full JSON backups carry their original timestamps; CSV imports use now.
+				createdAt: withId.createdAt ?? Date.now(),
 				cardId
 			};
 		});
@@ -240,14 +189,11 @@ class TransactionStore {
 		await bulkAddTransactions(transactionsWithIds);
 
 		if (mode === 'replace') {
-			this.transactions = transactionsWithIds.sort(
+			this.transactions = transactionsWithIds.sort((a, b) => b.createdAt - a.createdAt);
+		} else {
+			this.transactions = [...this.transactions, ...transactionsWithIds].sort(
 				(a, b) => b.createdAt - a.createdAt
 			);
-		} else {
-			this.transactions = [
-				...this.transactions,
-				...transactionsWithIds
-			].sort((a, b) => b.createdAt - a.createdAt);
 		}
 	}
 

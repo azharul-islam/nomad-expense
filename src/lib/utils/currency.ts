@@ -60,10 +60,18 @@ export function formatCurrencyInput(amount: string): {
 }
 
 /**
- * Parse a display string (from edit form) back to cents.
+ * Parse a display/edit value back to cents.
+ *
+ * Accepts strings (keypad/display callers) as well as numbers: `bind:value` on an
+ * `<input type="number">` yields a number (and `undefined` when cleared), so a
+ * string-only signature made edit forms throw instead of saving.
  */
-export function parseAmountToCents(val: string): number {
-	const parsed = parseFloat(val);
+export function parseAmountToCents(val: string | number | null | undefined): number {
+	if (val === null || val === undefined) return 0;
+	// Strip thousand separators (",") and stray whitespace so "1,234.56" parses as 123456.
+	const cleaned = String(val).trim().replace(/,/g, '').replace(/\s+/g, '');
+	if (cleaned === '') return 0;
+	const parsed = parseFloat(cleaned);
 	if (isNaN(parsed)) return 0;
 	return Math.round(parsed * 100);
 }

@@ -2,16 +2,35 @@
 	import { transactionStore } from '$lib/stores.svelte';
 	import { CURRENCY_SYMBOL, formatCurrency, splitCurrency } from '$lib/utils/currency';
 
-	const isPositive = $derived(transactionStore.balance >= 0);
-	const balanceParts = $derived(splitCurrency(formatCurrency(transactionStore.balance)));
+	const incomeParts = $derived(splitCurrency(formatCurrency(transactionStore.incomeTotal)));
+	const expenseParts = $derived(splitCurrency(formatCurrency(transactionStore.expenseTotal)));
+	const netParts = $derived(splitCurrency(formatCurrency(transactionStore.netBalance)));
+	const netPositive = $derived(transactionStore.netBalance >= 0);
 </script>
 
-<div class="flex shrink-0 flex-col items-center justify-center pt-2 pb-4">
-	<div class="mt-2 flex items-baseline gap-1.5 ">
-		<span class="text-lg font-semibold text-gray-400 dark:text-slate-500">{CURRENCY_SYMBOL}</span>
-		<span class="font-mono text-5xl font-bold tracking-tight {isPositive ? 'text-gray-900 dark:text-white' : 'text-rose-600 dark:text-rose-400'}" 
+<div class="shrink-0 px-4 pt-3 pb-1">
+	<div class="grid grid-cols-2 gap-3">
+		<div class="rounded-2xl bg-success/10 px-4 py-3">
+			<p class="text-xs font-semibold tracking-wide text-success uppercase">Income</p>
+			<p data-testid="income-balance" class="mt-1 font-mono text-lg font-bold text-success">
+				{CURRENCY_SYMBOL}{incomeParts[0]}<span class="text-sm">.{incomeParts[1]}</span>
+			</p>
+		</div>
+		<div class="rounded-2xl bg-destructive/10 px-4 py-3">
+			<p class="text-xs font-semibold tracking-wide text-destructive uppercase">Expense</p>
+			<p data-testid="expense-balance" class="mt-1 font-mono text-lg font-bold text-destructive">
+				{CURRENCY_SYMBOL}{expenseParts[0]}<span class="text-sm">.{expenseParts[1]}</span>
+			</p>
+		</div>
+	</div>
+	<div class="mt-1.5 flex items-center justify-center gap-1.5">
+		<span class="text-xs font-semibold tracking-wider text-muted-foreground uppercase">Net</span>
+		<span
+			data-testid="tracker-net-balance"
+			class="font-mono text-base font-bold {netPositive ? 'text-foreground' : 'text-destructive'}"
 		>
-			{balanceParts[0]}<span class="text-3xl">.{balanceParts[1]}</span>
+			{CURRENCY_SYMBOL}
+			{netParts[0]}<span class="text-sm text-muted-foreground">.{netParts[1]}</span>
 		</span>
 	</div>
 </div>
